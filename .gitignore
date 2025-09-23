@@ -1,0 +1,9 @@
+node_modules
+.env
+data.backup.json
+data.json
+data.primary.json
+graph.json
+hashrate.txt
+state.json
+monthly_bests.json
