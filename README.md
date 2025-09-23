@@ -54,23 +54,6 @@ L’API sera disponible sur `http://localhost:3000`.
 
 ---
 
-## Routes disponibles
-
-### Webhooks
-
-* `POST /webhook/main` : réception des données principales de la pool
-* `POST /webhook/graph` : mise à jour des graphes
-
-### API publiques
-
-* `GET /api/graph.json` : statistiques de hashrate (JSON)
-* `GET /api/monthlyBests` : meilleures shares du mois
-* `GET /api/top` : top mineurs
-
-*(ajoutez vos routes spécifiques ici)*
-
----
-
 ## Structure du projet
 
 ```
