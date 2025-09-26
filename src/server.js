@@ -34,6 +34,8 @@ app.use(require("./routes/api.stats.routes"));
 app.use(require("./routes/api.pings.routes"));
 app.use(require("./routes/api.top.routes"));
 app.use(require("./routes/api.monthlyBests.routes"));
+app.use(require("./routes/api.node.routes"));
+
 
 // tâches périodiques
 setInterval(periodicSync, 60 * 1000);
