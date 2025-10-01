@@ -8,7 +8,8 @@ const parseList = (s) => (s || "")
 module.exports = {
   PORT: Number(process.env.PORT || 3000),
   AUTH_TOKEN: process.env.AUTH_TOKEN,
-  FRESHNESS_MS: Number(process.env.FRESHNESS_MS || 21 * 60 * 1000),
+  AUTH_API: process.env.AUTH_API || "",
+  FRESHNESS_MS: Number(process.env.FRESHNESS_MS || 5 * 60 * 1000),
   SSL_KEY_PATH: process.env.SSL_KEY_PATH,
   SSL_CERT_PATH: process.env.SSL_CERT_PATH,
   CORS_ORIGINS: parseList(process.env.CORS_ORIGINS)
