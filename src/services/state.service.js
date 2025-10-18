@@ -1,6 +1,8 @@
+// services/state.service.js
 const { loadJsonSafe, saveJson, readTextSafe, appendText } = require("./file.service");
 const { STATE_FILE, PRIMARY_DATA_FILE, BACKUP_DATA_FILE, DATA_FILE, HASHRATE_FILE } = require("../config/paths");
 const { FRESHNESS_MS } = require("../config/env");
+const { writeCombinedData } = require("./combine.service"); // ⬅️ ajout
 
 const isFresh = (ts) => {
   if (!ts) return false;
@@ -39,7 +41,10 @@ exports.getActiveData = async () => {
 exports.syncCompatDataFile = async () => {
   const { state, data } = await this.getActiveData();
   if (state.activeSource === "none") return;
-  await saveJson(DATA_FILE, data);
+
+  // ⚠️ Au lieu d'écrire la data active brute, on écrit la vue combinée
+  // (active comme base + fusion primary/backup pour monthly_bests, users best*, pool bestshare)
+  await writeCombinedData(data);
 };
 
 exports.appendHashrateIfNeeded = async (hashrate, source, dateObj = new Date()) => {
