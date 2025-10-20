@@ -25,7 +25,7 @@ exports.mainWebhook = async (req, res, next) => {
       );
     }
 
-    await appendHashrateIfNeeded(hashrate, source, new Date());
+    await appendHashrateIfNeeded(hashrate, state.activeSource, new Date());
     res.send(
       `✅ Données enregistrées (${source}), active=${state.activeSource} — monthly_bests: +${mb.inserted} / ↑${mb.updated} (total ${mb.total})`
     );

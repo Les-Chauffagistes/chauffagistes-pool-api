@@ -3,6 +3,7 @@ const { loadJsonSafe, saveJson, readTextSafe, appendText } = require("./file.ser
 const { STATE_FILE, PRIMARY_DATA_FILE, BACKUP_DATA_FILE, DATA_FILE, HASHRATE_FILE } = require("../config/paths");
 const { FRESHNESS_MS } = require("../config/env");
 const { writeCombinedData } = require("./combine.service"); // ⬅️ ajout
+const fs = require("fs").promises;
 
 const isFresh = (ts) => {
   if (!ts) return false;
@@ -51,12 +52,24 @@ exports.appendHashrateIfNeeded = async (hashrate, source, dateObj = new Date()) 
   const today = dateObj.toISOString().slice(0, 10);
   const raw = await readTextSafe(HASHRATE_FILE);
   const lines = raw ? raw.split("\n").filter(Boolean) : [];
-  const exists = lines.some(l => {
-    const [d, , src] = l.split(";");
-    return d === today;
-  });
-  if (!exists) {
-    await appendText(HASHRATE_FILE, `${today};${hashrate};${source}\n`);
+  const idx = lines.findIndex(l => l.split(";")[0] === today);
+
+  const newLine = `${today};${hashrate};${source}`;
+
+  if (idx === -1) {
+    // Pas d’entrée aujourd’hui → on écrit
+    await appendText(HASHRATE_FILE, newLine + "\n");
+    return;
+  }
+
+  // Il existe déjà une ligne pour aujourd’hui → on remplace si différent
+  const parts = lines[idx].split(";");
+  const oldSrc = parts[2];
+  const oldHashrate = parts[1];
+
+  if (oldSrc !== source || oldHashrate !== String(hashrate)) {
+    lines[idx] = newLine;
+    await fs.writeFile(HASHRATE_FILE, lines.join("\n") + "\n", "utf8");
   }
 };
 
