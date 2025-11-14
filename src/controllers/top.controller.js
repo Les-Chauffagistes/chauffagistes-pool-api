@@ -15,9 +15,14 @@ exports.getTop = async (req, res, next) => {
         return sum + (parseHashrate(w.hashrate1hr) || 0);
       }, 0);
 
-      const bestShare = workers.reduce((max, w) => {
-        return Math.max(max, w.bestshare || 0);
+      const bestShareFromWorkers = workers.reduce((max, w) => {
+        return Math.max(max, Number(w.bestshare) || 0);
       }, 0);
+
+      const bestShareUser  = Number(user.bestshare) || 0;
+      const bestEverUser   = Number(user.bestever)  || 0;
+
+      const bestShare = Math.max(bestShareFromWorkers, bestShareUser, bestEverUser);
 
       return {
         address,
