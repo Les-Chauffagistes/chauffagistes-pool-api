@@ -47,44 +47,80 @@ function clone(obj) {
 }
 
 /**
- * Merge des users: union des adresses; pour chaque adresse, on choisit
- * l'objet "base" venant de la source qui a le bestever le plus élevé,
- * puis on remonte bestever et bestshare à leur max respectif.
+ * Merge des users en partant de la data "active".
+ *
+ * - On garde TOUTES les infos (hashrate, shares, workers[], etc.)
+ *   telles qu'elles sont dans activeUsers.
+ * - On met à jour uniquement :
+ *    - user.bestever  = max(bestever/bestshare sur active, primary, backup)
+ *    - worker.bestever (par workername) = max(bestever/bestshare sur active, primary, backup)
+ *
+ * On n'ajoute pas de nouvelles adresses qui n'existent pas dans activeUsers :
+ * le set d'adresses reste celui de la source active.
  */
-function mergeUsers(primaryUsers = {}, backupUsers = {}) {
-  const addresses = new Set([...Object.keys(primaryUsers || {}), ...Object.keys(backupUsers || {})]);
-  const merged = {};
+function mergeUsers(activeUsers = {}, primaryUsers = {}, backupUsers = {}) {
+  const merged = clone(activeUsers) || {};
+  const addresses = Object.keys(merged);
+
+  // petite helper pour faire un max sur une liste de valeurs numériques potentielles
+  const maxOf = (...vals) => {
+    let max = null;
+    for (const v of vals) {
+      const n = Number(v);
+      if (Number.isNaN(n)) continue;
+      if (max === null || n > max) max = n;
+    }
+    return max;
+  };
 
   for (const addr of addresses) {
+    const activeUser = merged[addr] || {};
     const p = primaryUsers[addr];
-    const q = backupUsers[addr];
+    const b = backupUsers[addr];
 
-    if (p && !q) {
-      merged[addr] = clone(p);
-      continue;
+    // -------- bestever au niveau de l'adresse --------
+    const bestEverUser = maxOf(
+      activeUser.bestever,
+      activeUser.bestshare, // fallback si bestever absent
+      p && p.bestever,
+      p && p.bestshare,
+      b && b.bestever,
+      b && b.bestshare
+    );
+
+    if (bestEverUser !== null) {
+      activeUser.bestever = bestEverUser;
     }
-    if (!p && q) {
-      merged[addr] = clone(q);
-      continue;
+
+    // -------- bestever au niveau des workers --------
+    if (Array.isArray(activeUser.worker)) {
+      for (const w of activeUser.worker) {
+        const name = w.workername;
+
+        const getWorkerByName = (user, workername) => {
+          if (!user || !Array.isArray(user.worker)) return null;
+          return user.worker.find(x => x.workername === workername) || null;
+        };
+
+        const pW = getWorkerByName(p, name);
+        const bW = getWorkerByName(b, name);
+
+        const bestEverWorker = maxOf(
+          w.bestever,
+          w.bestshare, // fallback
+          pW && pW.bestever,
+          pW && pW.bestshare,
+          bW && bW.bestever,
+          bW && bW.bestshare
+        );
+
+        if (bestEverWorker !== null) {
+          w.bestever = bestEverWorker;
+        }
+      }
     }
 
-    // Les deux existent → choisir base avec bestever le plus haut
-    const pBestEver = Number(p.bestever ?? p.bestshare ?? 0);
-    const qBestEver = Number(q.bestever ?? q.bestshare ?? 0);
-    const base = pBestEver >= qBestEver ? clone(p) : clone(q);
-    const other = base === p ? q : p;
-
-    // Monter bestever & bestshare au max
-    const maxBestEver  = nmax(p.bestever,  q.bestever);
-    const maxBestShare = nmax(p.bestshare, q.bestshare);
-
-    if (!Number.isNaN(maxBestEver))  base.bestever  = maxBestEver;
-    if (!Number.isNaN(maxBestShare)) base.bestshare = maxBestShare;
-
-    // (Optionnel) si tu veux aussi “promouvoir” le worker qui a fait le bestever
-    // il faudrait identifier quel worker est associé; on s’en tient ici à l’adresse.
-
-    merged[addr] = base;
+    merged[addr] = activeUser;
   }
 
   return merged;
@@ -98,9 +134,10 @@ function mergeUsers(primaryUsers = {}, backupUsers = {}) {
  * - monthly_bests (par mois sdiff max).
  */
 function buildCombined(activeData = {}, primary = {}, backup = {}) {
+  // on part de la data active (clone pour ne pas la muter)
   const combined = clone(activeData) || {};
 
-  // pool.shares.bestshare
+  // pool.shares.bestshare → max global entre primary et backup (laisse le reste de pool tel quel)
   const pBest = primary?.pool?.shares?.bestshare;
   const bBest = backup?.pool?.shares?.bestshare;
   const maxPoolBest = nmax(pBest, bBest);
@@ -110,11 +147,18 @@ function buildCombined(activeData = {}, primary = {}, backup = {}) {
     combined.pool.shares.bestshare = maxPoolBest;
   }
 
-  // users (par adresse)
-  combined.users = mergeUsers(primary?.users || {}, backup?.users || {});
+  // users → on garde la structure de activeData, on ne touche qu'aux bestever (user + workers)
+  combined.users = mergeUsers(
+    combined.users || {},
+    primary?.users || {},
+    backup?.users || {}
+  );
 
-  // monthly_bests
-  combined.monthly_bests = mergeMonthlyBestsArrays(primary?.monthly_bests || [], backup?.monthly_bests || []);
+  // monthly_bests → on garde ton merge par sdiff max
+  combined.monthly_bests = mergeMonthlyBestsArrays(
+    primary?.monthly_bests || [],
+    backup?.monthly_bests || []
+  );
 
   return combined;
 }
@@ -128,6 +172,7 @@ async function writeCombinedData(activeData = null) {
     loadJsonSafe(BACKUP_DATA_FILE, {}),
   ]);
 
+  // activeData si fourni, sinon primary comme base
   const base = activeData || primary || {};
   const combined = buildCombined(base, primary, backup);
   await saveJson(DATA_FILE, combined);
