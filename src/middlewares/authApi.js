@@ -19,7 +19,7 @@ function requireToken(req, res, next) {
 
   // Debug (en dev seulement) — n'affiche pas le token réel en prod !
   if (process.env.NODE_ENV !== "production") {
-    console.log(`[auth debug] provided="${provided}" expected_set=${expected !== ""}`);
+    console.log(`[auth debug] provided_len=${provided.length} expected_set=${expected !== ""}`);
   }
 
   if (!provided || provided !== expected) {
